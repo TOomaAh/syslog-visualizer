@@ -51,7 +51,7 @@ A full-stack project for collecting and visualizing syslog messages in real-time
 
 ## Prerequisites
 
-- Go 1.21 or higher
+- Go 1.24 or higher
 - Node.js 18+ and npm
 
 ## Installation
