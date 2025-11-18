@@ -198,9 +198,9 @@ func TestParseRFC5424(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		wantErr  bool
+		name      string
+		input     string
+		wantErr   bool
 		isRFC5424 bool
 	}{
 		{

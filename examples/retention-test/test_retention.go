@@ -25,7 +25,7 @@ func main() {
 	defer store.Close()
 	defer os.Remove(dbPath) // Clean up after test
 
-	fmt.Println("Testing data retention feature\n")
+	fmt.Println("Testing data retention feature")
 
 	// Create test messages with different timestamps
 	now := time.Now()
