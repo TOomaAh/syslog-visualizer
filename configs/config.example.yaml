@@ -1,0 +1,20 @@
+# Syslog Collector Configuration
+collector:
+  # Address to listen on for syslog messages
+  address: "0.0.0.0:514"
+  # Protocol: "udp", "tcp", or "both"
+  protocol: "udp"
+
+# Storage Configuration
+storage:
+  # Type: "memory", "sqlite", "postgresql"
+  type: "memory"
+  # Connection string (for database backends)
+  connection: ""
+
+# Visualizer Configuration
+visualizer:
+  # Web server port
+  port: 8080
+  # Enable authentication
+  auth_enabled: false

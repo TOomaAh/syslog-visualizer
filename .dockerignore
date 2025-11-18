@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+
+# bdd
+*.sqlite
+*.sqlite3
+*.db
+
+# Documentation
+*.md
+CLAUDE.md
+README.md
+docs/
+
+# Examples
+examples/
+
+# Build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+test_*.go
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Web (handled by web/.dockerignore)
+web/node_modules/
+web/.next/
+web/out/
+web/build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

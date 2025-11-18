@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Backend Go service (Syslog collector + API)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: syslog-backend-prod
+    ports:
+      - "514:514/udp"
+      - "514:514/tcp"
+    expose:
+      - "8080"
+    volumes:
+      - syslog-data:/data
+    environment:
+      # Data retention - keep logs for 30 days in production
+      - RETENTION_PERIOD=${RETENTION_PERIOD:-30d}
+      - CLEANUP_INTERVAL=${CLEANUP_INTERVAL:-24h}
+      - ENABLE_RETENTION=${ENABLE_RETENTION:-true}
+      # Authentication - REQUIRED in production
+      - ENABLE_AUTH=${ENABLE_AUTH:-true}
+      - AUTH_USERS=${AUTH_USERS}
+    restart: always
+    networks:
+      - syslog-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Frontend Next.js service
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: syslog-frontend-prod
+    expose:
+      - "3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8080
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - syslog-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: syslog-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-cache:/var/cache/nginx
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+    networks:
+      - syslog-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  syslog-data:
+    driver: local
+  nginx-cache:
+    driver: local
+
+networks:
+  syslog-network:
+    driver: bridge

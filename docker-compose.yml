@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Backend Go service (Syslog collector + API)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: syslog-backend
+    ports:
+      - "514:514/udp"    # Syslog UDP
+      - "514:514/tcp"    # Syslog TCP
+      - "8080:8080"      # API
+    volumes:
+      - syslog-data:/data
+    environment:
+      # Data retention
+      - RETENTION_PERIOD=${RETENTION_PERIOD:-7d}
+      - CLEANUP_INTERVAL=${CLEANUP_INTERVAL:-1h}
+      - ENABLE_RETENTION=${ENABLE_RETENTION:-true}
+      # Authentication (disabled by default)
+      - ENABLE_AUTH=${ENABLE_AUTH:-false}
+      - AUTH_USERS=${AUTH_USERS:-}
+    restart: unless-stopped
+    networks:
+      - syslog-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Next.js service
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: syslog-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8080
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - syslog-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  syslog-data:
+    driver: local
+
+networks:
+  syslog-network:
+    driver: bridge
