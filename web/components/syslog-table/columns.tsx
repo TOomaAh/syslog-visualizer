@@ -245,8 +245,8 @@ export const columns: ColumnDef<SyslogMessage>[] = [
     minSize: 80,
     maxSize: 120,
     cell: ({ row }) => {
-      const msgid = row.original.msgid
-      return <span className="font-mono text-xs text-muted-foreground">{msgid || '-'}</span>
+      const msgID = row.original.msgID
+      return <span className="font-mono text-xs text-muted-foreground">{msgID || '-'}</span>
     },
   },
   {
