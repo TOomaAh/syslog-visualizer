@@ -11,13 +11,17 @@ import {
 import { formatDistanceToNow } from "date-fns"
 
 export interface SyslogMessage {
+  id?: number
   timestamp: string
   hostname: string
   facility: number
   severity: number
+  priority?: number
   tag: string
   message: string
   pid?: string
+  msgid?: string
+  structuredData?: string
 }
 
 const severityNames: Record<number, string> = {
@@ -54,124 +58,219 @@ const facilityNames: Record<number, string> = {
   23: "local7",
 }
 
-const getSeverityColor = (severity: string) => {
-  const colors: Record<string, string> = {
-    emergency: "bg-red-600 text-white hover:bg-red-700",
-    alert: "bg-orange-600 text-white hover:bg-orange-700",
-    critical: "bg-orange-500 text-white hover:bg-orange-600",
-    error: "bg-red-500 text-white hover:bg-red-600",
-    warning: "bg-yellow-500 text-black hover:bg-yellow-600",
-    notice: "bg-blue-500 text-white hover:bg-blue-600",
-    info: "bg-green-500 text-white hover:bg-green-600",
-    debug: "bg-gray-500 text-white hover:bg-gray-600",
+const getSeverityConfig = (severity: string, severityNumber: number) => {
+  const configs: Record<string, { color: string; textColor: string; bgColor: string; borderColor: string }> = {
+    emergency: {
+      color: "border-red-600 text-red-700",
+      textColor: "text-red-700",
+      bgColor: "bg-red-50",
+      borderColor: "#dc2626"
+    },
+    alert: {
+      color: "border-orange-600 text-orange-700",
+      textColor: "text-orange-700",
+      bgColor: "bg-orange-50",
+      borderColor: "#ea580c"
+    },
+    critical: {
+      color: "border-orange-500 text-orange-600",
+      textColor: "text-orange-600",
+      bgColor: "bg-orange-50",
+      borderColor: "#f97316"
+    },
+    error: {
+      color: "border-red-500 text-red-600",
+      textColor: "text-red-600",
+      bgColor: "bg-red-50",
+      borderColor: "#ef4444"
+    },
+    warning: {
+      color: "border-yellow-500 text-yellow-700",
+      textColor: "text-yellow-700",
+      bgColor: "bg-yellow-50",
+      borderColor: "#eab308"
+    },
+    notice: {
+      color: "border-blue-500 text-blue-600",
+      textColor: "text-blue-600",
+      bgColor: "bg-blue-50",
+      borderColor: "#3b82f6"
+    },
+    info: {
+      color: "border-green-500 text-green-600",
+      textColor: "text-green-600",
+      bgColor: "bg-green-50",
+      borderColor: "#10b981"
+    },
+    debug: {
+      color: "border-gray-400 text-gray-600",
+      textColor: "text-gray-600",
+      bgColor: "bg-gray-50",
+      borderColor: "#9ca3af"
+    },
   }
-  return colors[severity] || "bg-gray-400"
+  return configs[severity] || { color: "border-gray-400 text-gray-600", textColor: "text-gray-600", bgColor: "bg-gray-50", borderColor: "#9ca3af" }
 }
+
+// Export for use in data-table for row styling
+export { getSeverityConfig, severityNames }
 
 export const columns: ColumnDef<SyslogMessage>[] = [
   {
+    accessorKey: "id",
+    header: "ID",
+    minSize: 60,
+    maxSize: 80,
+    cell: ({ row }) => {
+      const id = row.original.id || row.index + 1
+      return <span className="font-mono text-xs text-muted-foreground">{id}</span>
+    },
+  },
+  {
     accessorKey: "timestamp",
-    header: "Time",
-    size: 200,
+    header: "Timestamp",
+    minSize: 180,
+    maxSize: 200,
     cell: ({ row }) => {
       const timestamp = row.getValue("timestamp") as string
       try {
         const date = new Date(timestamp)
         return (
-          <div className="flex flex-col gap-1">
-            <span className="font-medium text-sm">
-              {formatDistanceToNow(date, { addSuffix: true })}
-            </span>
-            <span className="font-mono text-xs text-muted-foreground">
-              {date.toLocaleString()}
-            </span>
-          </div>
+          <span className="font-mono text-xs">
+            {date.toLocaleString('en-US', {
+              month: 'short',
+              day: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false
+            })}
+          </span>
         )
       } catch {
-        return <span className="font-mono text-sm">{timestamp}</span>
+        return <span className="font-mono text-xs">{timestamp}</span>
       }
     },
   },
   {
     accessorKey: "severity",
     header: "Severity",
-    size: 130,
+    minSize: 100,
+    maxSize: 120,
     cell: ({ row }) => {
       const severity = row.getValue("severity") as number
       const severityName = severityNames[severity] || "unknown"
+      const config = getSeverityConfig(severityName, severity)
       return (
-        <Badge className={`${getSeverityColor(severityName)} px-3 py-1 text-xs font-semibold`}>
-          {severityName}
-        </Badge>
-      )
-    },
-  },
-  {
-    accessorKey: "facility",
-    header: "Facility",
-    size: 110,
-    cell: ({ row }) => {
-      const facility = row.getValue("facility") as number
-      return (
-        <span className="text-sm font-medium bg-muted px-2 py-1 rounded">
-          {facilityNames[facility] || "unknown"}
+        <span className={`${config.color} ${config.bgColor} border-l-2 px-2 py-0.5 text-xs font-medium capitalize inline-block`}>
+          {severityName} {severity}
         </span>
       )
     },
   },
   {
-    accessorKey: "hostname",
-    header: "Hostname",
-    size: 170,
-    cell: ({ row }) => (
-      <span className="font-semibold text-sm">{row.getValue("hostname")}</span>
-    ),
-  },
-  {
-    accessorKey: "tag",
-    header: "Tag",
-    size: 170,
+    accessorKey: "priority",
+    header: "Priority",
+    minSize: 80,
+    maxSize: 90,
     cell: ({ row }) => {
-      const tag = row.getValue("tag") as string
-      const pid = row.original.pid
-      return (
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-medium">{tag}</span>
-          {pid && (
-            <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
-              {pid}
-            </span>
-          )}
-        </div>
-      )
+      const facility = row.original.facility
+      const severity = row.original.severity
+      const priority = row.original.priority || (facility * 8 + severity)
+      return <span className="font-mono text-xs text-muted-foreground">{priority}</span>
     },
   },
   {
     accessorKey: "message",
     header: "Message",
-    size: 500,
+    minSize: 300,
     cell: ({ row }) => {
       const message = row.getValue("message") as string
       return (
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="truncate cursor-help text-sm leading-relaxed">
+              <div className="truncate cursor-help text-xs font-mono">
                 {message}
               </div>
             </TooltipTrigger>
             <TooltipContent
               side="bottom"
               align="start"
-              className="max-w-2xl break-words p-4"
+              className="max-w-3xl break-words p-3"
             >
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              <p className="whitespace-pre-wrap text-xs font-mono">
                 {message}
               </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
       )
+    },
+  },
+  {
+    accessorKey: "hostname",
+    header: "Hostname",
+    minSize: 120,
+    maxSize: 180,
+    cell: ({ row }) => (
+      <span className="text-xs">{row.getValue("hostname")}</span>
+    ),
+  },
+  {
+    accessorKey: "tag",
+    header: "App Name",
+    minSize: 120,
+    maxSize: 180,
+    cell: ({ row }) => {
+      const tag = row.getValue("tag") as string
+      return <span className="text-xs">{tag}</span>
+    },
+  },
+  {
+    accessorKey: "pid",
+    header: "Proc ID",
+    minSize: 70,
+    maxSize: 90,
+    cell: ({ row }) => {
+      const pid = row.original.pid
+      return <span className="font-mono text-xs text-muted-foreground">{pid || '-'}</span>
+    },
+  },
+  {
+    accessorKey: "msgid",
+    header: "Msg ID",
+    minSize: 80,
+    maxSize: 120,
+    cell: ({ row }) => {
+      const msgid = row.original.msgid
+      return <span className="font-mono text-xs text-muted-foreground">{msgid || '-'}</span>
+    },
+  },
+  {
+    accessorKey: "facility",
+    header: "Facility",
+    minSize: 90,
+    maxSize: 120,
+    cell: ({ row }) => {
+      const facility = row.getValue("facility") as number
+      const facilityName = facilityNames[facility] || "unknown"
+      return (
+        <span className="text-xs">
+          {facilityName} {facility}
+        </span>
+      )
+    },
+  },
+  {
+    accessorKey: "structuredData",
+    header: "Structured Data",
+    minSize: 120,
+    maxSize: 200,
+    cell: ({ row }) => {
+      const data = row.original.structuredData
+      return <span className="font-mono text-xs text-muted-foreground truncate">{data || '-'}</span>
     },
   },
 ]

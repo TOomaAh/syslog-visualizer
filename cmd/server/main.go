@@ -120,9 +120,11 @@ func main() {
 	protectedMux := http.NewServeMux()
 	protectedMux.HandleFunc("/api/syslogs", handleGetSyslogs(store))
 	protectedMux.HandleFunc("/api/filter-options", handleGetFilterOptions(store))
+	protectedMux.HandleFunc("/api/timeline", handleGetTimeline(store))
 
 	mux.Handle("/api/syslogs", authManager.Middleware(protectedMux))
 	mux.Handle("/api/filter-options", authManager.Middleware(protectedMux))
+	mux.Handle("/api/timeline", authManager.Middleware(protectedMux))
 
 	apiHandler := enableCORS(mux)
 
@@ -425,6 +427,137 @@ func handleGetFilterOptions(store storage.Storage) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(options)
+	}
+}
+
+type TimeSlot struct {
+	Timestamp      time.Time         `json:"timestamp"`
+	SeverityCounts map[int]int       `json:"severity_counts"`
+	Total          int               `json:"total"`
+}
+
+func handleGetTimeline(store storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		queryParams := r.URL.Query()
+
+		// Get all messages (no pagination)
+		filters := storage.QueryFilters{
+			Limit: 100000, // Large limit to get all messages
+		}
+
+		// Apply optional filters
+		if severitiesStr := queryParams.Get("severities"); severitiesStr != "" {
+			severities := parseIntSlice(severitiesStr)
+			if len(severities) > 0 {
+				filters.Severities = severities
+			}
+		}
+
+		if facilitiesStr := queryParams.Get("facilities"); facilitiesStr != "" {
+			facilities := parseIntSlice(facilitiesStr)
+			if len(facilities) > 0 {
+				filters.Facilities = facilities
+			}
+		}
+
+		if hostnamesStr := queryParams.Get("hostnames"); hostnamesStr != "" {
+			hostnames := parseStringSlice(hostnamesStr)
+			if len(hostnames) > 0 {
+				filters.Hostnames = hostnames
+			}
+		}
+
+		messages, err := store.Query(filters)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(messages) == 0 {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]TimeSlot{})
+			return
+		}
+
+		// Find time range
+		var oldestTime, newestTime time.Time
+		for i, msg := range messages {
+			if i == 0 {
+				oldestTime = msg.Timestamp
+				newestTime = msg.Timestamp
+			} else {
+				if msg.Timestamp.Before(oldestTime) {
+					oldestTime = msg.Timestamp
+				}
+				if msg.Timestamp.After(newestTime) {
+					newestTime = msg.Timestamp
+				}
+			}
+		}
+
+		// Use now if newer than newest message
+		now := time.Now()
+		if now.After(newestTime) {
+			newestTime = now
+		}
+
+		totalDuration := newestTime.Sub(oldestTime)
+
+		// Calculate slot duration based on time range
+		var slotDuration time.Duration
+		var numSlots int
+
+		if totalDuration <= 10*time.Minute {
+			slotDuration = 30 * time.Second
+		} else if totalDuration <= time.Hour {
+			slotDuration = 2 * time.Minute
+		} else if totalDuration <= 24*time.Hour {
+			slotDuration = 30 * time.Minute
+		} else {
+			slotDuration = 2 * time.Hour
+		}
+
+		numSlots = int(totalDuration / slotDuration)
+		if numSlots > 60 {
+			numSlots = 60
+			slotDuration = totalDuration / 60
+		}
+		if numSlots == 0 {
+			numSlots = 1
+		}
+
+		// Create time slots
+		slots := make([]TimeSlot, numSlots)
+		for i := 0; i < numSlots; i++ {
+			slotStart := oldestTime.Add(time.Duration(i) * slotDuration)
+			slots[i] = TimeSlot{
+				Timestamp:      slotStart,
+				SeverityCounts: make(map[int]int),
+				Total:          0,
+			}
+		}
+
+		// Count messages in each slot
+		for _, msg := range messages {
+			slotIndex := int(msg.Timestamp.Sub(oldestTime) / slotDuration)
+			if slotIndex >= numSlots {
+				slotIndex = numSlots - 1
+			}
+			if slotIndex < 0 {
+				slotIndex = 0
+			}
+
+			slots[slotIndex].SeverityCounts[msg.Severity]++
+			slots[slotIndex].Total++
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(slots)
 	}
 }
 

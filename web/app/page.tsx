@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { ColumnFiltersState } from "@tanstack/react-table"
 import { DataTable } from "@/components/syslog-table/data-table"
 import { columns, SyslogMessage } from "@/components/syslog-table/columns"
+import { TimelineChart } from "@/components/timeline-chart"
 
 // Map severity names to numbers
 const severityNameToNumber: Record<string, number> = {
@@ -52,19 +53,29 @@ interface FilterOptions {
 export default function Home() {
   const [data, setData] = useState<SyslogMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
-  const [totalRows, setTotalRows] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [offset, setOffset] = useState(0)
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null)
+  const [isLiveUpdateEnabled, setIsLiveUpdateEnabled] = useState(true)
   const router = useRouter()
+  const loadMoreRef = useRef<HTMLDivElement>(null)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (currentOffset: number, isLoadingMore = false, isSilentRefresh = false) => {
     try {
-      const params = new URLSearchParams()
+      if (isLoadingMore) {
+        setLoadingMore(true)
+      } else if (!isSilentRefresh) {
+        setLoading(true)
+      }
 
-      params.append("limit", pagination.pageSize.toString())
-      params.append("offset", (pagination.pageIndex * pagination.pageSize).toString())
+      const params = new URLSearchParams()
+      const pageSize = 50
+
+      params.append("limit", pageSize.toString())
+      params.append("offset", currentOffset.toString())
 
       const severityFilter = columnFilters.find((f) => f.id === "severity")
       if (severityFilter && Array.isArray(severityFilter.value)) {
@@ -114,16 +125,24 @@ export default function Home() {
       }
       const json = await response.json()
 
-      // API now returns { data: [...], total: N }
-      setData(json.data || [])
-      setTotalRows(json.total || 0)
+      const newData = json.data || []
+
+      if (isLoadingMore) {
+        setData(prev => [...prev, ...newData])
+      } else {
+        setData(newData)
+      }
+
+      setOffset(currentOffset + pageSize)
+      setHasMore(newData.length === pageSize)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
-  }, [columnFilters, pagination, router])
+  }, [columnFilters, router])
 
   useEffect(() => {
     const fetchFilterOptions = async () => {
@@ -149,19 +168,48 @@ export default function Home() {
     fetchFilterOptions()
   }, [router])
 
-  // Reset to first page when filters change
+  // Initial load and filter changes
   useEffect(() => {
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+    setOffset(0)
+    setHasMore(true)
+    fetchData(0, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnFilters])
 
+  // Poll for new messages every 5 seconds
   useEffect(() => {
-    fetchData()
+    if (!isLiveUpdateEnabled) return
 
-    // Poll for new messages every 5 seconds
-    const interval = setInterval(fetchData, 5000)
+    const interval = setInterval(() => {
+      // Only refresh if user hasn't scrolled down (offset is still at initial position)
+      if (offset <= 50) {
+        fetchData(0, false, true)
+      }
+    }, 5000)
 
     return () => clearInterval(interval)
-  }, [fetchData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLiveUpdateEnabled, offset])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMore || loadingMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          // Load next batch
+          fetchData(offset, true)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    observer.observe(loadMoreRef.current)
+
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loadingMore, offset])
 
   const handleLogout = async () => {
     try {
@@ -177,48 +225,79 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen p-6 md:p-10 bg-background">
-      <div className="mx-auto max-w-[1600px] space-y-8">
-        <div className="flex items-center justify-between pb-2">
-          <div className="space-y-3">
-            <h1 className="text-4xl font-bold tracking-tight">
+    <main className="h-screen flex flex-col p-6 md:p-10 bg-background overflow-hidden">
+      <div className="mx-auto w-full max-w-[95vw] flex flex-col h-full">
+        <div className="flex items-center justify-between pb-4 flex-shrink-0">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">
               Syslog Visualizer
             </h1>
-            <p className="text-base text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Real-time syslog monitoring with advanced filtering
             </p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="rounded-lg bg-muted px-5 py-2.5 text-sm font-semibold hover:bg-muted/80 transition-colors"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsLiveUpdateEnabled(!isLiveUpdateEnabled)}
+              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                isLiveUpdateEnabled
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              {isLiveUpdateEnabled ? '● Live' : '○ Paused'}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="rounded-lg bg-muted px-5 py-2.5 text-sm font-semibold hover:bg-muted/80 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {loading && (
-          <div className="flex items-center justify-center p-8">
+          <div className="flex items-center justify-center p-8 flex-grow">
             <div className="text-muted-foreground">Loading...</div>
           </div>
         )}
 
         {error && (
-          <div className="rounded-md bg-destructive/15 p-4 text-destructive">
+          <div className="rounded-md bg-destructive/15 p-4 text-destructive flex-shrink-0">
             Error: {error}
           </div>
         )}
 
         {!loading && !error && (
-          <DataTable
-            columns={columns}
-            data={data}
-            columnFilters={columnFilters}
-            onColumnFiltersChange={setColumnFilters}
-            pagination={pagination}
-            onPaginationChange={setPagination}
-            rowCount={totalRows}
-            filterOptions={filterOptions}
-          />
+          <div className="flex flex-col gap-4 flex-grow min-h-0">
+            <TimelineChart filters={{
+              severities: columnFilters.find(f => f.id === "severity")
+                ? (columnFilters.find(f => f.id === "severity")?.value as string[])
+                    .map(name => severityNameToNumber[name])
+                    .filter(num => num !== undefined)
+                    .join(",")
+                : undefined,
+              facilities: columnFilters.find(f => f.id === "facility")
+                ? (columnFilters.find(f => f.id === "facility")?.value as string[])
+                    .map(name => facilityNameToNumber[name])
+                    .filter(num => num !== undefined)
+                    .join(",")
+                : undefined,
+              hostnames: columnFilters.find(f => f.id === "hostname")
+                ? (columnFilters.find(f => f.id === "hostname")?.value as string[]).join(",")
+                : undefined,
+            }} />
+            <DataTable
+              columns={columns}
+              data={data}
+              columnFilters={columnFilters}
+              onColumnFiltersChange={setColumnFilters}
+              filterOptions={filterOptions}
+              loadMoreRef={loadMoreRef}
+              loadingMore={loadingMore}
+              hasMore={hasMore}
+            />
+          </div>
         )}
       </div>
     </main>

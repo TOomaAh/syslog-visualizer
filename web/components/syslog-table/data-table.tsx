@@ -4,19 +4,18 @@ import * as React from "react"
 import {
   ColumnDef,
   ColumnFiltersState,
-  PaginationState,
   SortingState,
   VisibilityState,
   flexRender,
   getCoreRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
 
 import { DataTableToolbar } from "./data-table-toolbar"
+import { getSeverityConfig, severityNames, SyslogMessage } from "./columns"
 
 interface FilterOptions {
   hostnames: string[]
@@ -30,10 +29,10 @@ interface DataTableProps<TData, TValue> {
   data: TData[]
   columnFilters?: ColumnFiltersState
   onColumnFiltersChange?: (filters: ColumnFiltersState) => void
-  pagination?: PaginationState
-  onPaginationChange?: (pagination: PaginationState) => void
-  rowCount?: number
   filterOptions?: FilterOptions | null
+  loadMoreRef?: React.RefObject<HTMLDivElement>
+  loadingMore?: boolean
+  hasMore?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -41,20 +40,21 @@ export function DataTable<TData, TValue>({
   data,
   columnFilters: externalColumnFilters,
   onColumnFiltersChange: externalOnColumnFiltersChange,
-  pagination: externalPagination,
-  onPaginationChange: externalOnPaginationChange,
-  rowCount,
   filterOptions,
+  loadMoreRef,
+  loadingMore,
+  hasMore,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
   const [internalColumnFilters, setInternalColumnFilters] =
     React.useState<ColumnFiltersState>([])
-  const [internalPagination, setInternalPagination] =
-    React.useState<PaginationState>({ pageIndex: 0, pageSize: 10 })
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnSizing, setColumnSizing] = React.useState({})
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+  const previousDataLengthRef = React.useRef(data.length)
+  const scrollPositionRef = React.useRef(0)
 
   // Use external filters if provided, otherwise use internal state
   const columnFilters = externalColumnFilters ?? internalColumnFilters
@@ -71,20 +71,33 @@ export function DataTable<TData, TValue>({
     [externalOnColumnFiltersChange, columnFilters]
   )
 
-  // Use external pagination if provided, otherwise use internal state
-  const pagination = externalPagination ?? internalPagination
+  // Track scroll position continuously
+  React.useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
 
-  const setPagination = React.useCallback(
-    (updater: PaginationState | ((old: PaginationState) => PaginationState)) => {
-      if (externalOnPaginationChange) {
-        const newValue = typeof updater === "function" ? updater(pagination) : updater
-        externalOnPaginationChange(newValue)
-      } else {
-        setInternalPagination(updater)
-      }
-    },
-    [externalOnPaginationChange, pagination]
-  )
+    const handleScroll = () => {
+      scrollPositionRef.current = container.scrollTop
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // Restore scroll position after data refresh (only if data length is similar - meaning it's a refresh, not initial load or filter change)
+  React.useLayoutEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const dataDiff = Math.abs(data.length - previousDataLengthRef.current)
+
+    // If data length changed by less than 50 rows, it's likely a refresh, restore scroll position
+    if (dataDiff <= 50 && dataDiff > 0 && scrollPositionRef.current > 0) {
+      container.scrollTop = scrollPositionRef.current
+    }
+
+    previousDataLengthRef.current = data.length
+  }, [data])
 
   const table = useReactTable({
     data,
@@ -95,9 +108,7 @@ export function DataTable<TData, TValue>({
       rowSelection,
       columnFilters,
       columnSizing,
-      pagination,
     },
-    pageCount: rowCount !== undefined ? Math.ceil(rowCount / pagination.pageSize) : -1,
     enableRowSelection: true,
     enableColumnResizing: true,
     columnResizeMode: "onChange",
@@ -106,41 +117,35 @@ export function DataTable<TData, TValue>({
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onColumnSizingChange: setColumnSizing,
-    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
-    // Server-side filtering and pagination
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     // Keep faceted models for filter UI
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-    // Disable client-side filtering and pagination since we're doing server-side
+    // Disable client-side filtering since we're doing server-side
     manualFiltering: true,
-    manualPagination: true,
   })
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col h-full min-h-0">
       <DataTableToolbar table={table} filterOptions={filterOptions} />
-      <div className="rounded-lg border shadow-sm bg-card">
-        <div className="overflow-x-auto">
-          <table
-            style={{
-              width: table.getCenterTotalSize(),
-            }}
-          >
-            <thead>
+      <div className="rounded-xl border shadow-md bg-card flex flex-col flex-grow min-h-0 mt-4">
+        <div ref={scrollContainerRef} className="overflow-auto flex-grow">
+          <table className="w-full">
+            <thead className="sticky top-0 z-10 bg-gray-100 border-b">
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id} className="border-b bg-muted/30">
+                <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
                       colSpan={header.colSpan}
                       style={{
-                        width: header.getSize(),
+                        minWidth: `${header.column.columnDef.minSize}px`,
+                        maxWidth: header.column.columnDef.maxSize ? `${header.column.columnDef.maxSize}px` : undefined,
+                        width: header.column.columnDef.maxSize ? undefined : 'auto',
                         position: "relative",
                       }}
-                      className="h-14 px-6 text-left align-middle font-semibold text-sm tracking-wide [&:has([role=checkbox])]:pr-0"
+                      className="h-10 px-3 text-left align-middle font-semibold text-xs text-gray-600 [&:has([role=checkbox])]:pr-0"
                     >
                       {header.isPlaceholder
                         ? null
@@ -167,157 +172,86 @@ export function DataTable<TData, TValue>({
             </thead>
             <tbody>
               {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        style={{ width: cell.column.getSize() }}
-                        className="px-6 py-4 align-middle [&:has([role=checkbox])]:pr-0"
+                <>
+                  {table.getRowModel().rows.map((row, index) => {
+                    const message = row.original as SyslogMessage
+                    const severity = message.severity
+                    const severityName = severityNames[severity] || "unknown"
+                    const severityConfig = getSeverityConfig(severityName, severity)
+
+                    return (
+                      <tr
+                        key={row.id}
+                        data-state={row.getIsSelected() && "selected"}
+                        className={`
+                          border-b border-l-4
+                          transition-colors
+                          ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+                          hover:bg-gray-100
+                          data-[state=selected]:bg-blue-50
+                        `}
+                        style={{
+                          borderLeftColor: severityConfig.borderColor
+                        }}
                       >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
+                        {row.getVisibleCells().map((cell) => (
+                          <td
+                            key={cell.id}
+                            style={{
+                              minWidth: `${cell.column.columnDef.minSize}px`,
+                              maxWidth: cell.column.columnDef.maxSize ? `${cell.column.columnDef.maxSize}px` : undefined,
+                              width: cell.column.columnDef.maxSize ? undefined : 'auto',
+                            }}
+                            className="px-3 py-2 align-middle text-xs [&:has([role=checkbox])]:pr-0"
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })}
+                  {/* Infinite scroll trigger inside table */}
+                  {loadMoreRef && (
+                    <tr>
+                      <td colSpan={columns.length}>
+                        <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+                          {loadingMore && (
+                            <div className="text-sm text-muted-foreground">Loading more messages...</div>
+                          )}
+                          {!hasMore && data.length > 0 && (
+                            <div className="text-sm text-muted-foreground">No more messages</div>
+                          )}
+                        </div>
                       </td>
-                    ))}
-                  </tr>
-                ))
+                    </tr>
+                  )}
+                </>
               ) : (
                 <tr>
                   <td
                     colSpan={columns.length}
-                    className="h-24 text-center text-muted-foreground"
+                    className="h-24 text-center text-gray-500"
                   >
-                    No results.
+                    <span className="text-sm">No syslog messages found</span>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
-      <div className="flex items-center justify-between px-2 py-4 border-t bg-muted/20">
-        <div className="flex-1 text-sm font-medium text-muted-foreground">
-          {table.getRowModel().rows.length} message(s) total
-          {table.getSelectedRowModel().rows.length > 0 && (
-            <span className="ml-2">
-              ({table.getSelectedRowModel().rows.length} selected)
+        <div className="flex items-center justify-between px-3 py-2 border-t bg-gray-50 flex-shrink-0">
+          <div className="flex-1 text-xs text-gray-600">
+            <span>
+              {table.getRowModel().rows.length} message{table.getRowModel().rows.length !== 1 ? 's' : ''}
             </span>
-          )}
-        </div>
-        <div className="flex items-center space-x-6 lg:space-x-8">
-          <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">Rows per page</p>
-            <select
-              className="h-9 w-[75px] rounded-md border border-input bg-background px-2.5 text-sm font-medium"
-              value={table.getState().pagination.pageSize}
-              onChange={(e) => {
-                table.setPageSize(Number(e.target.value))
-              }}
-            >
-              {[10, 20, 30, 40, 50].map((pageSize) => (
-                <option key={pageSize} value={pageSize}>
-                  {pageSize}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount()}
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-30 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 w-9 p-0"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Go to first page</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <polyline points="11 17 6 12 11 7"></polyline>
-                <polyline points="18 17 13 12 18 7"></polyline>
-              </svg>
-            </button>
-            <button
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-30 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 w-9 p-0"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Go to previous page</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-            </button>
-            <button
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-30 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 w-9 p-0"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Go to next page</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </button>
-            <button
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-30 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 w-9 p-0"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Go to last page</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <polyline points="13 17 18 12 13 7"></polyline>
-                <polyline points="6 17 11 12 6 7"></polyline>
-              </svg>
-            </button>
+            {table.getSelectedRowModel().rows.length > 0 && (
+              <span className="ml-2 text-gray-500">
+                ({table.getSelectedRowModel().rows.length} selected)
+              </span>
+            )}
           </div>
         </div>
       </div>
