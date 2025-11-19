@@ -20,8 +20,9 @@ export interface SyslogMessage {
   tag: string
   message: string
   pid?: string
-  msgid?: string
-  structuredData?: string
+  appName?: string
+  procID?: string
+  msgID?: string
 }
 
 const severityNames: Record<number, string> = {
@@ -113,7 +114,7 @@ const getSeverityConfig = (severity: string, severityNumber: number) => {
 }
 
 // Export for use in data-table for row styling
-export { getSeverityConfig, severityNames }
+export { getSeverityConfig, severityNames, facilityNames }
 
 export const columns: ColumnDef<SyslogMessage>[] = [
   {
@@ -163,23 +164,20 @@ export const columns: ColumnDef<SyslogMessage>[] = [
       const severityName = severityNames[severity] || "unknown"
       const config = getSeverityConfig(severityName, severity)
       return (
-        <span className={`${config.color} ${config.bgColor} border-l-2 px-2 py-0.5 text-xs font-medium capitalize inline-block`}>
+        <span className={`${config.color} ${config.bgColor} border-l-2 px-2 py-0.5 text-xs font-medium capitalize inline-block whitespace-nowrap`}>
           {severityName} {severity}
         </span>
       )
     },
   },
   {
-    accessorKey: "priority",
-    header: "Priority",
-    minSize: 80,
-    maxSize: 90,
-    cell: ({ row }) => {
-      const facility = row.original.facility
-      const severity = row.original.severity
-      const priority = row.original.priority || (facility * 8 + severity)
-      return <span className="font-mono text-xs text-muted-foreground">{priority}</span>
-    },
+    accessorKey: "hostname",
+    header: "Hostname",
+    minSize: 120,
+    maxSize: 180,
+    cell: ({ row }) => (
+      <span className="text-xs">{row.getValue("hostname")}</span>
+    ),
   },
   {
     accessorKey: "message",
@@ -210,13 +208,16 @@ export const columns: ColumnDef<SyslogMessage>[] = [
     },
   },
   {
-    accessorKey: "hostname",
-    header: "Hostname",
-    minSize: 120,
-    maxSize: 180,
-    cell: ({ row }) => (
-      <span className="text-xs">{row.getValue("hostname")}</span>
-    ),
+    accessorKey: "priority",
+    header: "Priority",
+    minSize: 80,
+    maxSize: 90,
+    cell: ({ row }) => {
+      const facility = row.original.facility
+      const severity = row.original.severity
+      const priority = row.original.priority || (facility * 8 + severity)
+      return <span className="font-mono text-xs text-muted-foreground">{priority}</span>
+    },
   },
   {
     accessorKey: "tag",

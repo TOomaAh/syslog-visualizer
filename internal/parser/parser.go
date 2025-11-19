@@ -11,13 +11,14 @@ import (
 
 // SyslogMessage represents a parsed syslog message
 type SyslogMessage struct {
+	ID        uint      `json:"id,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
 	Hostname  string    `json:"hostname"`
 	Facility  int       `json:"facility"`
 	Severity  int       `json:"severity"`
 	Tag       string    `json:"tag"`
 	Message   string    `json:"message"`
-	Raw       string    `json:"raw"`
+	Raw       string    `json:"raw,omitempty"`
 	PID       string    `json:"pid,omitempty"`       // Process ID (RFC 3164)
 	AppName   string    `json:"appName,omitempty"`   // Application name (RFC 5424)
 	ProcID    string    `json:"procID,omitempty"`    // Process ID (RFC 5424)

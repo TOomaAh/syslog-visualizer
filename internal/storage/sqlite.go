@@ -160,6 +160,7 @@ func (s *SQLiteStorage) Query(filters QueryFilters) ([]*parser.SyslogMessage, er
 	messages := make([]*parser.SyslogMessage, len(models))
 	for i, model := range models {
 		messages[i] = &parser.SyslogMessage{
+			ID:        model.ID,
 			Timestamp: model.Timestamp,
 			Hostname:  model.Hostname,
 			Facility:  model.Facility,
@@ -259,6 +260,7 @@ func (s *SQLiteStorage) QueryWithCount(filters QueryFilters) ([]*parser.SyslogMe
 	messages := make([]*parser.SyslogMessage, len(models))
 	for i, model := range models {
 		messages[i] = &parser.SyslogMessage{
+			ID:        model.ID,
 			Timestamp: model.Timestamp,
 			Hostname:  model.Hostname,
 			Facility:  model.Facility,
@@ -430,6 +432,7 @@ func (s *SQLiteStorage) SearchMessages(searchTerm string, limit int) ([]*parser.
 	messages := make([]*parser.SyslogMessage, len(models))
 	for i, model := range models {
 		messages[i] = &parser.SyslogMessage{
+			ID:        model.ID,
 			Timestamp: model.Timestamp,
 			Hostname:  model.Hostname,
 			Facility:  model.Facility,

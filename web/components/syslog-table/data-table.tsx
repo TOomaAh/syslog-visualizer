@@ -15,7 +15,7 @@ import {
 } from "@tanstack/react-table"
 
 import { DataTableToolbar } from "./data-table-toolbar"
-import { getSeverityConfig, severityNames, SyslogMessage } from "./columns"
+import { getSeverityConfig, severityNames, SyslogMessage, facilityNames } from "./columns"
 
 interface FilterOptions {
   hostnames: string[]
@@ -47,7 +47,16 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
+    React.useState<VisibilityState>({
+      id: false,
+      priority: false,
+      tag: false,
+      pid: false,
+      msgid: false,
+      facility: false,
+      structuredData: false,
+    })
+  const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set())
   const [internalColumnFilters, setInternalColumnFilters] =
     React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -129,12 +138,13 @@ export function DataTable<TData, TValue>({
   return (
     <div className="flex flex-col h-full min-h-0">
       <DataTableToolbar table={table} filterOptions={filterOptions} />
-      <div className="rounded-xl border dark:border-slate-800 shadow-lg dark:shadow-slate-900/50 bg-card flex flex-col flex-grow min-h-0 mt-4">
+      <div className="border dark:border-slate-800 shadow-lg dark:shadow-slate-900/50 bg-card flex flex-col flex-grow min-h-0 mt-4 overflow-hidden rounded-b-xl">
         <div ref={scrollContainerRef} className="overflow-auto flex-grow">
           <table className="w-full">
-            <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-slate-800/95 backdrop-blur-sm border-b dark:border-slate-700">
+            <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-slate-800 border-b dark:border-slate-700">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
+                  <th className="w-8 px-2"></th>
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
@@ -142,7 +152,7 @@ export function DataTable<TData, TValue>({
                       style={{
                         minWidth: `${header.column.columnDef.minSize}px`,
                         maxWidth: header.column.columnDef.maxSize ? `${header.column.columnDef.maxSize}px` : undefined,
-                        width: header.column.columnDef.maxSize ? undefined : 'auto',
+                        width: header.column.getSize(),
                         position: "relative",
                       }}
                       className="h-10 px-3 text-left align-middle font-semibold text-xs text-gray-600 dark:text-slate-200 [&:has([role=checkbox])]:pr-0"
@@ -178,45 +188,95 @@ export function DataTable<TData, TValue>({
                     const severity = message.severity
                     const severityName = severityNames[severity] || "unknown"
                     const severityConfig = getSeverityConfig(severityName, severity)
+                    const isExpanded = expandedRows.has(row.id)
 
                     return (
-                      <tr
-                        key={row.id}
-                        data-state={row.getIsSelected() && "selected"}
-                        className={`
-                          border-b dark:border-slate-800/50 border-l-4
-                          transition-colors
-                          ${index % 2 === 0 ? 'bg-white dark:bg-slate-900/30' : 'bg-gray-50 dark:bg-slate-900/50'}
-                          hover:bg-gray-100 dark:hover:bg-slate-800/60
-                          data-[state=selected]:bg-blue-50 dark:data-[state=selected]:bg-blue-900/30
-                        `}
-                        style={{
-                          borderLeftColor: severityConfig.borderColor
-                        }}
-                      >
-                        {row.getVisibleCells().map((cell) => (
+                      <React.Fragment key={row.id}>
+                        <tr
+                          data-state={row.getIsSelected() && "selected"}
+                          className={`
+                            border-b dark:border-slate-800/50
+                            transition-colors cursor-pointer
+                            ${index % 2 === 0 ? 'bg-white dark:bg-slate-900/30' : 'bg-gray-50 dark:bg-slate-900/50'}
+                            hover:bg-gray-100 dark:hover:bg-slate-800/60
+                            data-[state=selected]:bg-blue-50 dark:data-[state=selected]:bg-blue-900/30
+                          `}
+                          onClick={() => {
+                            setExpandedRows(prev => {
+                              const next = new Set(prev)
+                              if (next.has(row.id)) {
+                                next.delete(row.id)
+                              } else {
+                                next.add(row.id)
+                              }
+                              return next
+                            })
+                          }}
+                        >
                           <td
-                            key={cell.id}
-                            style={{
-                              minWidth: `${cell.column.columnDef.minSize}px`,
-                              maxWidth: cell.column.columnDef.maxSize ? `${cell.column.columnDef.maxSize}px` : undefined,
-                              width: cell.column.columnDef.maxSize ? undefined : 'auto',
-                            }}
-                            className="px-3 py-2 align-middle text-xs [&:has([role=checkbox])]:pr-0"
+                            className="px-2 py-2 align-middle text-xs h-10 w-8"
+                            style={{ boxShadow: `inset 4px 0 0 ${severityConfig.borderColor}` }}
                           >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
-                            )}
+                            <span className="text-gray-400 dark:text-slate-500">
+                              {isExpanded ? '▼' : '▶'}
+                            </span>
                           </td>
-                        ))}
-                      </tr>
+                          {row.getVisibleCells().map((cell) => (
+                            <td
+                              key={cell.id}
+                              style={{
+                                minWidth: `${cell.column.columnDef.minSize}px`,
+                                maxWidth: cell.column.columnDef.maxSize ? `${cell.column.columnDef.maxSize}px` : undefined,
+                                width: cell.column.getSize(),
+                              }}
+                              className="px-3 py-2 align-middle text-xs h-10 [&:has([role=checkbox])]:pr-0"
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                        {isExpanded && (
+                          <tr className={`${index % 2 === 0 ? 'bg-white dark:bg-slate-900/30' : 'bg-gray-50 dark:bg-slate-900/50'}`}>
+                            <td colSpan={row.getVisibleCells().length + 1} className="px-6 py-3 border-b dark:border-slate-800/50">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                <div>
+                                  <span className="text-gray-500 dark:text-slate-400">ID:</span>
+                                  <span className="ml-2 font-mono">{message.id || '-'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 dark:text-slate-400">Priority:</span>
+                                  <span className="ml-2 font-mono">{message.priority || (message.facility * 8 + message.severity)}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 dark:text-slate-400">Facility:</span>
+                                  <span className="ml-2">{facilityNames[message.facility] || 'unknown'} ({message.facility})</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 dark:text-slate-400">App Name:</span>
+                                  <span className="ml-2">{message.appName || message.tag || '-'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 dark:text-slate-400">Proc ID:</span>
+                                  <span className="ml-2 font-mono">{message.procID || message.pid || '-'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 dark:text-slate-400">Msg ID:</span>
+                                  <span className="ml-2 font-mono">{message.msgID || '-'}</span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     )
                   })}
                   {/* Infinite scroll trigger inside table */}
                   {loadMoreRef && (
                     <tr>
-                      <td colSpan={columns.length} className="border-0">
+                      <td colSpan={columns.length + 1} className="border-0">
                         <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
                           {loadingMore && (
                             <div className="text-sm text-gray-500 dark:text-slate-400">Loading more messages...</div>
@@ -232,7 +292,7 @@ export function DataTable<TData, TValue>({
               ) : (
                 <tr>
                   <td
-                    colSpan={columns.length}
+                    colSpan={columns.length + 1}
                     className="h-24 text-center text-gray-500 dark:text-slate-400"
                   >
                     <span className="text-sm">No syslog messages found</span>
@@ -242,7 +302,7 @@ export function DataTable<TData, TValue>({
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-3 py-2 border-t dark:border-slate-800 bg-gray-50 dark:bg-slate-800/80 backdrop-blur-sm flex-shrink-0">
+        <div className="flex items-center justify-between pl-4 pr-3 py-2 border-t dark:border-slate-800 bg-gray-50 dark:bg-slate-800/80 backdrop-blur-sm flex-shrink-0">
           <div className="flex-1 text-xs text-gray-600 dark:text-slate-300">
             <span>
               {table.getRowModel().rows.length} message{table.getRowModel().rows.length !== 1 ? 's' : ''}
