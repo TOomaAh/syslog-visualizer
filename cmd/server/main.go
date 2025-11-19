@@ -121,10 +121,12 @@ func main() {
 	protectedMux.HandleFunc("/api/syslogs", handleGetSyslogs(store))
 	protectedMux.HandleFunc("/api/filter-options", handleGetFilterOptions(store))
 	protectedMux.HandleFunc("/api/timeline", handleGetTimeline(store))
+	protectedMux.HandleFunc("/api/export", handleExport(store))
 
 	mux.Handle("/api/syslogs", authManager.Middleware(protectedMux))
 	mux.Handle("/api/filter-options", authManager.Middleware(protectedMux))
 	mux.Handle("/api/timeline", authManager.Middleware(protectedMux))
+	mux.Handle("/api/export", authManager.Middleware(protectedMux))
 
 	apiHandler := enableCORS(mux)
 
@@ -648,5 +650,89 @@ func handleLogout(authManager *auth.AuthManager) http.HandlerFunc {
 			"status":  "success",
 			"message": "Logout successful",
 		})
+	}
+}
+
+func handleExport(store storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		queryParams := r.URL.Query()
+		format := queryParams.Get("format")
+		if format == "" {
+			format = "json"
+		}
+
+		// Build filters (no limit for export)
+		filters := storage.QueryFilters{
+			Limit: 100000, // Large limit for export
+		}
+
+		if severitiesStr := queryParams.Get("severities"); severitiesStr != "" {
+			severities := parseIntSlice(severitiesStr)
+			if len(severities) > 0 {
+				filters.Severities = severities
+			}
+		}
+
+		if facilitiesStr := queryParams.Get("facilities"); facilitiesStr != "" {
+			facilities := parseIntSlice(facilitiesStr)
+			if len(facilities) > 0 {
+				filters.Facilities = facilities
+			}
+		}
+
+		if hostnamesStr := queryParams.Get("hostnames"); hostnamesStr != "" {
+			hostnames := parseStringSlice(hostnamesStr)
+			if len(hostnames) > 0 {
+				filters.Hostnames = hostnames
+			}
+		}
+
+		if search := queryParams.Get("search"); search != "" {
+			filters.Search = search
+		}
+
+		messages, err := store.Query(filters)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		filename := fmt.Sprintf("syslog-export-%s", time.Now().Format("2006-01-02"))
+
+		switch format {
+		case "csv":
+			w.Header().Set("Content-Type", "text/csv")
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.csv", filename))
+
+			// Write CSV header
+			w.Write([]byte("ID,Timestamp,Severity,Hostname,Tag,Message,Facility,PID\n"))
+
+			// Write CSV rows
+			for _, msg := range messages {
+				// Escape message for CSV
+				escapedMsg := strings.ReplaceAll(msg.Message, "\"", "\"\"")
+				line := fmt.Sprintf("%d,%s,%d,%s,%s,\"%s\",%d,%s\n",
+					msg.ID,
+					msg.Timestamp.Format(time.RFC3339),
+					msg.Severity,
+					msg.Hostname,
+					msg.Tag,
+					escapedMsg,
+					msg.Facility,
+					msg.PID,
+				)
+				w.Write([]byte(line))
+			}
+
+		default: // json
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.json", filename))
+			json.NewEncoder(w).Encode(messages)
+		}
 	}
 }

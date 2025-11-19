@@ -1,12 +1,19 @@
 "use client"
 
-import { Cross2Icon } from "@radix-ui/react-icons"
+import { Cross2Icon, DownloadIcon } from "@radix-ui/react-icons"
 import { Table } from "@tanstack/react-table"
 import { AlertCircle, AlertTriangle, Info, XCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DataTableFacetedFilter } from "./data-table-faceted-filter"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { SyslogMessage } from "./columns"
 
 interface FilterOptions {
   hostnames: string[]
@@ -25,6 +32,67 @@ export function DataTableToolbar<TData>({
   filterOptions,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
+
+  const buildExportUrl = (format: string) => {
+    const params = new URLSearchParams()
+    params.append('format', format)
+
+    // Get current filters from table state
+    const filters = table.getState().columnFilters
+
+    const severityFilter = filters.find(f => f.id === 'severity')
+    if (severityFilter && Array.isArray(severityFilter.value)) {
+      const severityNameToNumber: Record<string, number> = {
+        emergency: 0, alert: 1, critical: 2, error: 3,
+        warning: 4, notice: 5, info: 6, debug: 7
+      }
+      const severities = (severityFilter.value as string[])
+        .map(name => severityNameToNumber[name])
+        .filter(num => num !== undefined)
+      if (severities.length > 0) {
+        params.append('severities', severities.join(','))
+      }
+    }
+
+    const facilityFilter = filters.find(f => f.id === 'facility')
+    if (facilityFilter && Array.isArray(facilityFilter.value)) {
+      const facilityNameToNumber: Record<string, number> = {
+        kern: 0, user: 1, mail: 2, daemon: 3, auth: 4, syslog: 5,
+        lpr: 6, news: 7, uucp: 8, cron: 9, authpriv: 10, ftp: 11,
+        local0: 16, local1: 17, local2: 18, local3: 19,
+        local4: 20, local5: 21, local6: 22, local7: 23
+      }
+      const facilities = (facilityFilter.value as string[])
+        .map(name => facilityNameToNumber[name])
+        .filter(num => num !== undefined)
+      if (facilities.length > 0) {
+        params.append('facilities', facilities.join(','))
+      }
+    }
+
+    const hostnameFilter = filters.find(f => f.id === 'hostname')
+    if (hostnameFilter && Array.isArray(hostnameFilter.value)) {
+      const hostnames = hostnameFilter.value as string[]
+      if (hostnames.length > 0) {
+        params.append('hostnames', hostnames.join(','))
+      }
+    }
+
+    const messageFilter = filters.find(f => f.id === 'message')
+    if (messageFilter && typeof messageFilter.value === 'string') {
+      params.append('search', messageFilter.value)
+    }
+
+    return `/api/export?${params.toString()}`
+  }
+
+  const exportToCSV = () => {
+    window.location.href = buildExportUrl('csv')
+  }
+
+  const exportToJSON = () => {
+    window.location.href = buildExportUrl('json')
+  }
 
   const severityNames: Record<number, { name: string; icon: any }> = {
     0: { name: "emergency", icon: XCircle },
@@ -129,6 +197,22 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" className="h-10 px-3">
+            <DownloadIcon className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={exportToCSV}>
+            Export CSV
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={exportToJSON}>
+            Export JSON
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
