@@ -129,10 +129,10 @@ export function DataTable<TData, TValue>({
   return (
     <div className="flex flex-col h-full min-h-0">
       <DataTableToolbar table={table} filterOptions={filterOptions} />
-      <div className="rounded-xl border shadow-md bg-card flex flex-col flex-grow min-h-0 mt-4">
+      <div className="rounded-xl border dark:border-slate-800 shadow-lg dark:shadow-slate-900/50 bg-card flex flex-col flex-grow min-h-0 mt-4">
         <div ref={scrollContainerRef} className="overflow-auto flex-grow">
           <table className="w-full">
-            <thead className="sticky top-0 z-10 bg-gray-100 border-b">
+            <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-slate-800/95 backdrop-blur-sm border-b dark:border-slate-700">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
@@ -145,7 +145,7 @@ export function DataTable<TData, TValue>({
                         width: header.column.columnDef.maxSize ? undefined : 'auto',
                         position: "relative",
                       }}
-                      className="h-10 px-3 text-left align-middle font-semibold text-xs text-gray-600 [&:has([role=checkbox])]:pr-0"
+                      className="h-10 px-3 text-left align-middle font-semibold text-xs text-gray-600 dark:text-slate-200 [&:has([role=checkbox])]:pr-0"
                     >
                       {header.isPlaceholder
                         ? null
@@ -184,11 +184,11 @@ export function DataTable<TData, TValue>({
                         key={row.id}
                         data-state={row.getIsSelected() && "selected"}
                         className={`
-                          border-b border-l-4
+                          border-b dark:border-slate-800/50 border-l-4
                           transition-colors
-                          ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                          hover:bg-gray-100
-                          data-[state=selected]:bg-blue-50
+                          ${index % 2 === 0 ? 'bg-white dark:bg-slate-900/30' : 'bg-gray-50 dark:bg-slate-900/50'}
+                          hover:bg-gray-100 dark:hover:bg-slate-800/60
+                          data-[state=selected]:bg-blue-50 dark:data-[state=selected]:bg-blue-900/30
                         `}
                         style={{
                           borderLeftColor: severityConfig.borderColor
@@ -216,13 +216,13 @@ export function DataTable<TData, TValue>({
                   {/* Infinite scroll trigger inside table */}
                   {loadMoreRef && (
                     <tr>
-                      <td colSpan={columns.length}>
+                      <td colSpan={columns.length} className="border-0">
                         <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
                           {loadingMore && (
-                            <div className="text-sm text-muted-foreground">Loading more messages...</div>
+                            <div className="text-sm text-gray-500 dark:text-slate-400">Loading more messages...</div>
                           )}
                           {!hasMore && data.length > 0 && (
-                            <div className="text-sm text-muted-foreground">No more messages</div>
+                            <div className="text-sm text-gray-500 dark:text-slate-400">No more messages</div>
                           )}
                         </div>
                       </td>
@@ -233,7 +233,7 @@ export function DataTable<TData, TValue>({
                 <tr>
                   <td
                     colSpan={columns.length}
-                    className="h-24 text-center text-gray-500"
+                    className="h-24 text-center text-gray-500 dark:text-slate-400"
                   >
                     <span className="text-sm">No syslog messages found</span>
                   </td>
@@ -242,8 +242,8 @@ export function DataTable<TData, TValue>({
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-3 py-2 border-t bg-gray-50 flex-shrink-0">
-          <div className="flex-1 text-xs text-gray-600">
+        <div className="flex items-center justify-between px-3 py-2 border-t dark:border-slate-800 bg-gray-50 dark:bg-slate-800/80 backdrop-blur-sm flex-shrink-0">
+          <div className="flex-1 text-xs text-gray-600 dark:text-slate-300">
             <span>
               {table.getRowModel().rows.length} message{table.getRowModel().rows.length !== 1 ? 's' : ''}
             </span>

@@ -80,7 +80,7 @@ func main() {
 		log.Println("WARNING: Authentication disabled: API is publicly accessible")
 	}
 
-	dbPath := getEnv("DB_PATH", "/data/syslog.db")
+	dbPath := getEnv("DB_PATH", "./data/syslog.db")
 	store, err := storage.NewSQLiteStorage(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
@@ -431,9 +431,9 @@ func handleGetFilterOptions(store storage.Storage) http.HandlerFunc {
 }
 
 type TimeSlot struct {
-	Timestamp      time.Time         `json:"timestamp"`
-	SeverityCounts map[int]int       `json:"severity_counts"`
-	Total          int               `json:"total"`
+	Timestamp      time.Time   `json:"timestamp"`
+	SeverityCounts map[int]int `json:"severity_counts"`
+	Total          int         `json:"total"`
 }
 
 func handleGetTimeline(store storage.Storage) http.HandlerFunc {
@@ -613,10 +613,10 @@ func handleLogin(authManager *auth.AuthManager) http.HandlerFunc {
 		// Return success with API token
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
-			"status":    "success",
-			"username":  credentials.Username,
-			"apiToken":  apiToken,
-			"message":   "Login successful",
+			"status":   "success",
+			"username": credentials.Username,
+			"apiToken": apiToken,
+			"message":  "Login successful",
 		})
 	}
 }

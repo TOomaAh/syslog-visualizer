@@ -60,8 +60,33 @@ export default function Home() {
   const [offset, setOffset] = useState(0)
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null)
   const [isLiveUpdateEnabled, setIsLiveUpdateEnabled] = useState(true)
+  const [isDarkMode, setIsDarkMode] = useState(false)
   const router = useRouter()
   const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  // Load theme preference on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme')
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const shouldBeDark = savedTheme === 'dark' || (!savedTheme && prefersDark)
+
+    setIsDarkMode(shouldBeDark)
+    if (shouldBeDark) {
+      document.documentElement.classList.add('dark')
+    }
+  }, [])
+
+  // Toggle theme
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode)
+    if (!isDarkMode) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }
 
   const fetchData = useCallback(async (currentOffset: number, isLoadingMore = false, isSilentRefresh = false) => {
     try {
@@ -225,31 +250,38 @@ export default function Home() {
   }
 
   return (
-    <main className="h-screen flex flex-col p-6 md:p-10 bg-background overflow-hidden">
+    <main className="h-screen flex flex-col p-6 md:p-10 bg-background dark:bg-slate-950 overflow-hidden">
       <div className="mx-auto w-full max-w-[95vw] flex flex-col h-full">
         <div className="flex items-center justify-between pb-4 flex-shrink-0">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-slate-100">
               Syslog Visualizer
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-600 dark:text-slate-400">
               Real-time syslog monitoring with advanced filtering
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={toggleTheme}
+              className="rounded-lg bg-slate-200 dark:bg-slate-800 px-3 py-2.5 text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors shadow-sm"
+              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
+            <button
               onClick={() => setIsLiveUpdateEnabled(!isLiveUpdateEnabled)}
-              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors shadow-sm ${
                 isLiveUpdateEnabled
-                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900/70'
+                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
               }`}
             >
               {isLiveUpdateEnabled ? '● Live' : '○ Paused'}
             </button>
             <button
               onClick={handleLogout}
-              className="rounded-lg bg-muted px-5 py-2.5 text-sm font-semibold hover:bg-muted/80 transition-colors"
+              className="rounded-lg bg-slate-200 dark:bg-slate-800 px-5 py-2.5 text-sm font-semibold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors shadow-sm"
             >
               Logout
             </button>
@@ -258,12 +290,12 @@ export default function Home() {
 
         {loading && (
           <div className="flex items-center justify-center p-8 flex-grow">
-            <div className="text-muted-foreground">Loading...</div>
+            <div className="text-gray-600 dark:text-slate-400">Loading...</div>
           </div>
         )}
 
         {error && (
-          <div className="rounded-md bg-destructive/15 p-4 text-destructive flex-shrink-0">
+          <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-4 text-red-600 dark:text-red-400 flex-shrink-0 border border-red-200 dark:border-red-800/50 shadow-sm">
             Error: {error}
           </div>
         )}

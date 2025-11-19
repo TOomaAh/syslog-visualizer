@@ -61,55 +61,55 @@ const facilityNames: Record<number, string> = {
 const getSeverityConfig = (severity: string, severityNumber: number) => {
   const configs: Record<string, { color: string; textColor: string; bgColor: string; borderColor: string }> = {
     emergency: {
-      color: "border-red-600 text-red-700",
-      textColor: "text-red-700",
-      bgColor: "bg-red-50",
+      color: "border-red-600 text-red-700 dark:text-red-300 dark:border-red-500",
+      textColor: "text-red-700 dark:text-red-300",
+      bgColor: "bg-red-50 dark:bg-red-950/50",
       borderColor: "#dc2626"
     },
     alert: {
-      color: "border-orange-600 text-orange-700",
-      textColor: "text-orange-700",
-      bgColor: "bg-orange-50",
+      color: "border-orange-600 text-orange-700 dark:text-orange-300 dark:border-orange-500",
+      textColor: "text-orange-700 dark:text-orange-300",
+      bgColor: "bg-orange-50 dark:bg-orange-950/50",
       borderColor: "#ea580c"
     },
     critical: {
-      color: "border-orange-500 text-orange-600",
-      textColor: "text-orange-600",
-      bgColor: "bg-orange-50",
+      color: "border-orange-500 text-orange-600 dark:text-orange-300 dark:border-orange-400",
+      textColor: "text-orange-600 dark:text-orange-300",
+      bgColor: "bg-orange-50 dark:bg-orange-950/50",
       borderColor: "#f97316"
     },
     error: {
-      color: "border-red-500 text-red-600",
-      textColor: "text-red-600",
-      bgColor: "bg-red-50",
+      color: "border-red-500 text-red-600 dark:text-red-300 dark:border-red-400",
+      textColor: "text-red-600 dark:text-red-300",
+      bgColor: "bg-red-50 dark:bg-red-950/50",
       borderColor: "#ef4444"
     },
     warning: {
-      color: "border-yellow-500 text-yellow-700",
-      textColor: "text-yellow-700",
-      bgColor: "bg-yellow-50",
+      color: "border-yellow-500 text-yellow-700 dark:text-yellow-300 dark:border-yellow-500",
+      textColor: "text-yellow-700 dark:text-yellow-300",
+      bgColor: "bg-yellow-50 dark:bg-yellow-950/50",
       borderColor: "#eab308"
     },
     notice: {
-      color: "border-blue-500 text-blue-600",
-      textColor: "text-blue-600",
-      bgColor: "bg-blue-50",
+      color: "border-blue-500 text-blue-600 dark:text-blue-300 dark:border-blue-400",
+      textColor: "text-blue-600 dark:text-blue-300",
+      bgColor: "bg-blue-50 dark:bg-blue-950/50",
       borderColor: "#3b82f6"
     },
     info: {
-      color: "border-green-500 text-green-600",
-      textColor: "text-green-600",
-      bgColor: "bg-green-50",
+      color: "border-green-500 text-green-600 dark:text-green-300 dark:border-green-400",
+      textColor: "text-green-600 dark:text-green-300",
+      bgColor: "bg-green-50 dark:bg-green-950/50",
       borderColor: "#10b981"
     },
     debug: {
-      color: "border-gray-400 text-gray-600",
-      textColor: "text-gray-600",
-      bgColor: "bg-gray-50",
+      color: "border-gray-400 text-gray-600 dark:text-slate-300 dark:border-slate-500",
+      textColor: "text-gray-600 dark:text-slate-300",
+      bgColor: "bg-gray-50 dark:bg-slate-800/50",
       borderColor: "#9ca3af"
     },
   }
-  return configs[severity] || { color: "border-gray-400 text-gray-600", textColor: "text-gray-600", bgColor: "bg-gray-50", borderColor: "#9ca3af" }
+  return configs[severity] || { color: "border-gray-400 text-gray-600 dark:text-slate-300", textColor: "text-gray-600 dark:text-slate-300", bgColor: "bg-gray-50 dark:bg-slate-800/50", borderColor: "#9ca3af" }
 }
 
 // Export for use in data-table for row styling

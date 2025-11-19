@@ -82,8 +82,8 @@ export function TimelineChart({ filters }: TimelineChartProps) {
 
   if (isInitialLoading) {
     return (
-      <div className="w-full bg-white border rounded-lg p-3">
-        <div className="h-16 flex items-center justify-center text-xs text-gray-500">
+      <div className="w-full bg-white dark:bg-slate-900/50 border dark:border-slate-800 rounded-lg p-3 shadow-md dark:shadow-slate-900/50">
+        <div className="h-16 flex items-center justify-center text-xs text-gray-500 dark:text-slate-400">
           Loading timeline...
         </div>
       </div>
@@ -95,7 +95,7 @@ export function TimelineChart({ filters }: TimelineChartProps) {
   }
 
   return (
-    <div className="w-full bg-white border rounded-lg p-3">
+    <div className="w-full bg-white dark:bg-slate-900/50 border dark:border-slate-800 rounded-lg p-3 shadow-md dark:shadow-slate-900/50">
       <div className="flex items-end gap-px h-12 mb-4">
         {slots.map((slot, index) => {
           const heightPercent = slot.total > 0 ? Math.max((slot.total / maxCount) * 100, 5) : 0
@@ -134,7 +134,7 @@ export function TimelineChart({ filters }: TimelineChartProps) {
           )
         })}
       </div>
-      <div className="flex justify-between text-[9px] text-gray-500 font-mono px-1">
+      <div className="flex justify-between text-[9px] text-gray-500 dark:text-slate-400 font-mono px-1">
         <span>{slots[0]?.label}</span>
         {slots.length > 2 && (
           <span>{slots[Math.floor(slots.length / 2)]?.label}</span>
