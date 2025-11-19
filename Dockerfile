@@ -21,8 +21,8 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o 
 # Stage 2: Runtime image
 FROM alpine:latest
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates sqlite-libs
+# Install runtime dependencies including timezone data
+RUN apk --no-cache add ca-certificates sqlite-libs tzdata
 
 WORKDIR /app
 
@@ -44,6 +44,7 @@ ENV ENABLE_RETENTION=true
 ENV ENABLE_AUTH=false
 ENV AUTH_USERS=""
 ENV DB_PATH=/data/syslog.db
+ENV TZ=UTC
 
 # Run the application
 CMD ["./syslog-server"]
