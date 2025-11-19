@@ -28,12 +28,15 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Install nginx and gettext (for envsubst)
-RUN apk add --no-cache nginx gettext
+# Install nginx, gettext (for envsubst), and wget (for healthchecks)
+RUN apk add --no-cache nginx gettext wget
 
 ENV NODE_ENV=production
 # Default backend URL (can be overridden via environment variable)
 ENV BACKEND_URL=http://backend:8080
+# Next.js standalone configuration
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
 # Copy necessary files from builder
 COPY --from=builder /app/.next/standalone ./
@@ -55,8 +58,25 @@ RUN echo '#!/bin/sh' > /start.sh && \
     echo 'set -e' >> /start.sh && \
     echo 'echo "Configuring nginx with BACKEND_URL=${BACKEND_URL}..."' >> /start.sh && \
     echo 'envsubst '"'"'${BACKEND_URL}'"'"' < /etc/nginx/templates/default.conf.template > /etc/nginx/http.d/default.conf' >> /start.sh && \
-    echo 'echo "Starting Next.js on port 3000..."' >> /start.sh && \
-    echo 'node server.js &' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo 'echo "Starting Next.js on port 3000 (listening on 0.0.0.0)..."' >> /start.sh && \
+    echo 'PORT=3000 HOSTNAME=0.0.0.0 node server.js &' >> /start.sh && \
+    echo 'NEXTJS_PID=$!' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo 'echo "Waiting for Next.js to be ready..."' >> /start.sh && \
+    echo 'for i in $(seq 1 30); do' >> /start.sh && \
+    echo '  if wget --quiet --tries=1 --spider http://localhost:3000 2>/dev/null; then' >> /start.sh && \
+    echo '    echo "Next.js is ready!"' >> /start.sh && \
+    echo '    break' >> /start.sh && \
+    echo '  fi' >> /start.sh && \
+    echo '  if [ $i -eq 30 ]; then' >> /start.sh && \
+    echo '    echo "ERROR: Next.js failed to start in 30 seconds"' >> /start.sh && \
+    echo '    exit 1' >> /start.sh && \
+    echo '  fi' >> /start.sh && \
+    echo '  echo "Waiting... ($i/30)"' >> /start.sh && \
+    echo '  sleep 1' >> /start.sh && \
+    echo 'done' >> /start.sh && \
+    echo '' >> /start.sh && \
     echo 'echo "Starting nginx on port 80..."' >> /start.sh && \
     echo 'nginx -g "daemon off;"' >> /start.sh && \
     chmod +x /start.sh
