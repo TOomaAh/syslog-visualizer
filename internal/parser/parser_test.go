@@ -319,15 +319,16 @@ func TestTimestampParsing(t *testing.T) {
 		t.Errorf("Timestamp year = %v, want %v", msg.Timestamp.Year(), currentYear)
 	}
 
-	// Verify time components
-	if msg.Timestamp.Month() != time.October {
-		t.Errorf("Timestamp month = %v, want October", msg.Timestamp.Month())
+	// Verify time components (RFC 3164 is parsed in local time)
+	localTime := msg.Timestamp.Local()
+	if localTime.Month() != time.October {
+		t.Errorf("Timestamp month = %v, want October", localTime.Month())
 	}
-	if msg.Timestamp.Day() != 11 {
-		t.Errorf("Timestamp day = %v, want 11", msg.Timestamp.Day())
+	if localTime.Day() != 11 {
+		t.Errorf("Timestamp day = %v, want 11", localTime.Day())
 	}
-	if msg.Timestamp.Hour() != 22 {
-		t.Errorf("Timestamp hour = %v, want 22", msg.Timestamp.Hour())
+	if localTime.Hour() != 22 {
+		t.Errorf("Timestamp hour = %v, want 22", localTime.Hour())
 	}
 }
 
