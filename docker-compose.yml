@@ -31,24 +31,25 @@ services:
       retries: 3
       start_period: 40s
 
-  # Frontend Next.js service
+  # Frontend Next.js service (with nginx reverse proxy)
   frontend:
     build:
       context: ./web
       dockerfile: Dockerfile
     container_name: syslog-frontend
     ports:
-      - "3000:3000"
+      - "80:80"           # nginx entry point
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8080
       - NODE_ENV=production
+      # Configure backend URL for nginx reverse proxy
+      - BACKEND_URL=${BACKEND_URL:-http://backend:8080}
     depends_on:
       - backend
     restart: unless-stopped
     networks:
       - syslog-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
       interval: 30s
       timeout: 10s
       retries: 3

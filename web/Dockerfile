@@ -1,7 +1,7 @@
-# Multi-stage Dockerfile for Syslog Visualizer Frontend (Next.js)
+# Multi-stage Dockerfile for Syslog Visualizer Frontend (Next.js + nginx)
 
 # Stage 1: Dependencies
-FROM node:18-alpine AS deps
+FROM node:20-alpine AS deps
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 # Stage 2: Builder
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -20,34 +20,45 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy source code
 COPY . .
 
-# Build Next.js application
+# Build Next.js application (standalone mode)
 RUN npm run build
 
-# Stage 3: Runner
-FROM node:18-alpine AS runner
+# Stage 3: Runner with nginx
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-ENV NODE_ENV=production
+# Install nginx and gettext (for envsubst)
+RUN apk add --no-cache nginx gettext
 
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+ENV NODE_ENV=production
+# Default backend URL (can be overridden via environment variable)
+ENV BACKEND_URL=http://backend:8080
 
 # Copy necessary files from builder
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Note: public folder is not copied as it doesn't exist yet
+# Add "COPY --from=builder /app/public ./public" if you add static assets
 
-# Change ownership to nextjs user
-RUN chown -R nextjs:nodejs /app
+# Copy nginx configuration template
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-USER nextjs
+# Create nginx run directory
+RUN mkdir -p /run/nginx
 
-# Expose port
-EXPOSE 3000
+# Expose port 80 (nginx entry point)
+EXPOSE 80
 
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+# Start script to run both nginx and Next.js
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'set -e' >> /start.sh && \
+    echo 'echo "Configuring nginx with BACKEND_URL=${BACKEND_URL}..."' >> /start.sh && \
+    echo 'envsubst '"'"'${BACKEND_URL}'"'"' < /etc/nginx/templates/default.conf.template > /etc/nginx/http.d/default.conf' >> /start.sh && \
+    echo 'echo "Starting Next.js on port 3000..."' >> /start.sh && \
+    echo 'node server.js &' >> /start.sh && \
+    echo 'echo "Starting nginx on port 80..."' >> /start.sh && \
+    echo 'nginx -g "daemon off;"' >> /start.sh && \
+    chmod +x /start.sh
 
-# Start the application
-CMD ["node", "server.js"]
+CMD ["/start.sh"]
