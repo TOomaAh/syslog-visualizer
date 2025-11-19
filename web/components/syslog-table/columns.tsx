@@ -164,8 +164,8 @@ export const columns: ColumnDef<SyslogMessage>[] = [
       const severityName = severityNames[severity] || "unknown"
       const config = getSeverityConfig(severityName, severity)
       return (
-        <span className={`${config.color} ${config.bgColor} border-l-2 px-2 py-0.5 text-xs font-medium capitalize inline-block whitespace-nowrap`}>
-          {severityName} {severity}
+        <span className={`${config.color} ${config.bgColor} border-l-2 px-2 py-0.5 text-xs font-medium capitalize inline-block whitespace-nowrap w-20 text-center`}>
+          {severityName}
         </span>
       )
     },
