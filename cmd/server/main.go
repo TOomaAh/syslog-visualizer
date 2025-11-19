@@ -80,7 +80,7 @@ func main() {
 		log.Println("WARNING: Authentication disabled: API is publicly accessible")
 	}
 
-	dbPath := "syslog.db"
+	dbPath := getEnv("DB_PATH", "/data/syslog.db")
 	store, err := storage.NewSQLiteStorage(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)

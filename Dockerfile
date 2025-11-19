@@ -43,6 +43,7 @@ ENV CLEANUP_INTERVAL=1h
 ENV ENABLE_RETENTION=true
 ENV ENABLE_AUTH=false
 ENV AUTH_USERS=""
+ENV DB_PATH=/data/syslog.db
 
 # Run the application
 CMD ["./syslog-server"]

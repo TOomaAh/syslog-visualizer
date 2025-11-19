@@ -13,7 +13,11 @@ services:
       - "8080:8080"      # API
     volumes:
       - syslog-data:/data
+      # For local development with persistent data, you can also use:
+      # - ./data:/data
     environment:
+      # Database
+      - DB_PATH=${DB_PATH:-/data/syslog.db}
       # Data retention
       - RETENTION_PERIOD=${RETENTION_PERIOD:-7d}
       - CLEANUP_INTERVAL=${CLEANUP_INTERVAL:-1h}
