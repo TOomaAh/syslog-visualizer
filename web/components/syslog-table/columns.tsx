@@ -264,14 +264,4 @@ export const columns: ColumnDef<SyslogMessage>[] = [
       )
     },
   },
-  {
-    accessorKey: "structuredData",
-    header: "Structured Data",
-    minSize: 120,
-    maxSize: 200,
-    cell: ({ row }) => {
-      const data = row.original.structuredData
-      return <span className="font-mono text-xs text-muted-foreground truncate">{data || '-'}</span>
-    },
-  },
 ]
