@@ -16,6 +16,8 @@ services:
       # For local development with persistent data, you can also use:
       # - ./data:/data
     environment:
+      # Timezone
+      - TZ=${TZ:-UTC}
       # Database
       - DB_PATH=${DB_PATH:-/data/syslog.db}
       # Data retention
